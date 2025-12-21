@@ -5,7 +5,7 @@ const app = express();
 // Configuration fixe 2025
 const PORT = process.env.PORT || 10000;
 const VERIFY_TOKEN = 'MAVA_SECRET_2025';
-const N8N_WEBHOOK_URL = 'romyse226.app.n8n.cloud';
+const const N8N_WEBHOOK_URL = 'romyse226.app.n8n.cloud';
 
 app.use(express.json());
 
@@ -47,6 +47,7 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 MAVA Backend actif sur le port ${PORT}`);
 });
+
 
 
 
