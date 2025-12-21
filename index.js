@@ -1,15 +1,15 @@
 const express = require('express');
-const axios = require('axios'); // Ajouté pour parler à n8n
+const axios = require('axios'); 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'MAVA_SECRET_2025';
 
-// REMPLACE l'URL ci-dessous par ton URL de Webhook n8n (Production ou Test)
-const N8N_WEBHOOK_URL = 'https://romyse226.app.n8n.cloud/webhook/whatsapp-in';
+// Configuration fixe 2025
+const PORT = process.env.PORT || 10000;
+const VERIFY_TOKEN = 'MAVA_SECRET_2025';
+const N8N_WEBHOOK_URL = 'https://romyse226.app.n8n.cloud/webhook-test/whatsapp-in';
 
 app.use(express.json());
 
-// Validation pour Meta
+// 1. Validation automatique pour Meta
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
@@ -22,22 +22,31 @@ app.get('/webhook', (req, res) => {
   res.sendStatus(403);
 });
 
-// Réception du message et transfert vers n8n
+// 2. Réception et transfert immédiat vers n8n
 app.post('/webhook', async (req, res) => {
-  console.log('📩 Message reçu de Meta, transfert vers n8n...');
-  
+  // Réponse immédiate à Meta pour éviter les timeouts
+  res.sendStatus(200);
+
   try {
-    // On envoie le message reçu directement à n8n
-    await axios.post(N8N_WEBHOOK_URL, req.body);
-    console.log('🚀 Transmis à n8n avec succès');
+    // Transfert vers ton n8n (mode test)
+    await axios.post(N8N_WEBHOOK_URL, req.body, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    console.log('🚀 Message transmis avec succès à n8n');
   } catch (error) {
     console.error('❌ Erreur de transfert vers n8n :', error.message);
   }
+});
 
-  res.sendStatus(200);
+// 3. Réponse propre pour l'accueil (UptimeRobot)
+app.get('/', (req, res) => {
+  res.status(200).send('MAVA Backend is Live 🚀');
 });
 
 app.listen(PORT, () => {
   console.log(`🚀 MAVA Backend actif sur le port ${PORT}`);
 });
+
+});
+
 
