@@ -5,7 +5,7 @@ const PORT = process.env.PORT || 3000;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || 'MAVA_SECRET_2025';
 
 // REMPLACE l'URL ci-dessous par ton URL de Webhook n8n (Production ou Test)
-const N8N_WEBHOOK_URL = 'ton-lien-n8n.cloud';
+const N8N_WEBHOOK_URL = 'https://romyse226.app.n8n.cloud/webhook/whatsapp-in';
 
 app.use(express.json());
 
@@ -40,3 +40,4 @@ app.post('/webhook', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 MAVA Backend actif sur le port ${PORT}`);
 });
+
