@@ -1,53 +1,41 @@
 const express = require('express');
-const axios = require('axios'); 
+const axios = require('axios');
 const app = express();
-
-// Configuration fixe 2025
-const PORT = process.env.PORT || 10000;
-const VERIFY_TOKEN = 'MAVA_SECRET_2025';
-const N8N_WEBHOOK_URL = 'romyse226.app.n8n.cloud';
 
 app.use(express.json());
 
-// 1. Validation automatique pour Meta
+// 1. LA ROUTE GET (Pour la validation Meta)
 app.get('/webhook', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
+  // On utilise ton jeton choisi
+  const VERIFY_TOKEN = "MAVA_SECRET_2025";
 
-  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-    console.log('✅ Webhook Meta validé !');
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+
+  if (mode === "subscribe" && token === VERIFY_TOKEN) {
+    console.log("WEBHOOK_VALIDE");
     return res.status(200).send(challenge);
   }
-  res.sendStatus(403);
+  return res.sendStatus(403);
 });
 
-// 2. Réception et transfert immédiat vers n8n
+// 2. LA ROUTE POST (Pour envoyer les messages à n8n)
 app.post('/webhook', async (req, res) => {
-  // Réponse immédiate à Meta pour éviter les timeouts
-  res.sendStatus(200);
-
   try {
-    // Transfert vers ton n8n (mode test)
-    await axios.post(N8N_WEBHOOK_URL, req.body, {
-      headers: { 'Content-Type': 'application/json' }
-    });
-    console.log('🚀 Message transmis avec succès à n8n');
+    // On envoie le message vers ton n8n Cloud
+    await axios.post("mavabot.app.n8n.cloud", req.body);
+    
+    // On répond OK à Meta immédiatement
+    res.sendStatus(200);
   } catch (error) {
-    console.error('❌ Erreur de transfert vers n8n :', error.message);
+    console.log("Erreur transfert n8n, mais on répond OK à Meta pour éviter les boucles");
+    res.sendStatus(200);
   }
 });
 
-// 3. Réponse propre pour l'accueil (UptimeRobot)
-app.get('/', (req, res) => {
-  res.status(200).send('MAVA Backend is Live 🚀');
-});
-
-// 4. Lancement du serveur
-app.listen(PORT, () => {
-  console.log(`🚀 MAVA Backend actif sur le port ${PORT}`);
-});
-
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`MAVA actif sur port ${PORT}`));
 
 
 
