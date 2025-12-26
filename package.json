@@ -1,7 +1,6 @@
 {
-  "name": "mava-backend",
+  "name": "mava-infrastructure",
   "version": "1.0.0",
-  "description": "Relais Meta vers n8n pour MAVA",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
