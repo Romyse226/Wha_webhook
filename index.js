@@ -6,8 +6,7 @@ app.use(express.json());
 
 // ===== TES CONFIGURATIONS =====
 const VERIFY_TOKEN = "MAVA_SECRET_2025";
-const N8N_WEBHOOK_URL = "https://mavabot.app.n8n.cloud/webhook/mava-core";
-
+const N8N_WEBHOOK_URL = "https://mavabot.app.n8n.cloud/webhook-test/mava-core";
 // Protection contre les doublons (en mémoire pour MVP)
 const processedMessages = new Set();
 
@@ -91,6 +90,7 @@ app.listen(PORT, () => {
   console.log(`🚀 MAVA Infrastructure active sur le port ${PORT}`);
   console.log(`📍 Webhook prêt à recevoir de Meta`);
 });
+
 
 
 
