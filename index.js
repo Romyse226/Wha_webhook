@@ -7,6 +7,7 @@ app.use(express.json());
 // ===== TES CONFIGURATIONS =====
 const VERIFY_TOKEN = "MAVA_SECRET_2025";
 const N8N_WEBHOOK_URL = "https://mavabot.app.n8n.cloud/webhook-test/mava-core";
+
 // Protection contre les doublons (en mémoire pour MVP)
 const processedMessages = new Set();
 
@@ -28,20 +29,34 @@ app.get('/webhook', (req, res) => {
 // ===== ROUTE POST (Messages entrants) =====
 app.post('/webhook', async (req, res) => {
   try {
+    // 🔍 LOG 1 : Voir TOUT ce que WhatsApp envoie
+    console.log("📦 PAYLOAD BRUT reçu de WhatsApp:");
+    console.log(JSON.stringify(req.body, null, 2));
+
     // 1. Extraire les données du payload Meta
     const entry = req.body.entry?.[0];
     const changes = entry?.changes?.[0];
     const value = changes?.value;
     const message = value?.messages?.[0];
 
+    // 🔍 LOG 2 : Vérifier ce qu'on a extrait
+    console.log("📋 Entry:", entry ? "✅" : "❌");
+    console.log("📋 Changes:", changes ? "✅" : "❌");
+    console.log("📋 Value:", value ? "✅" : "❌");
+    console.log("📋 Message:", message ? "✅" : "❌");
+
     // 2. Si pas de message, on répond OK et on arrête
     if (!message) {
       console.log("⚠️ Webhook reçu mais pas de message");
+      console.log("🔍 Contenu de req.body:", req.body);
       return res.sendStatus(200);
     }
 
     // 3. Extraire l'ID unique du message
     const wamid = message.id;
+
+    // 🔍 LOG 3 : Afficher le wamid
+    console.log("🆔 WAMID:", wamid);
 
     // 4. Vérifier si on a déjà traité ce message
     if (processedMessages.has(wamid)) {
@@ -61,25 +76,35 @@ app.post('/webhook', async (req, res) => {
       timestamp: message.timestamp
     };
 
-    console.log("📨 Message reçu:", payload);
+    // 🔍 LOG 4 : Voir ce qu'on va envoyer à n8n
+    console.log("📨 Payload préparé pour n8n:");
+    console.log(JSON.stringify(payload, null, 2));
 
     // 7. Envoyer vers n8n
-    await axios.post(N8N_WEBHOOK_URL, payload, {
+    const response = await axios.post(N8N_WEBHOOK_URL, payload, {
       timeout: 5000,
       headers: {
         'Content-Type': 'application/json'
       }
     });
 
-    console.log("✅ Envoyé vers n8n avec succès");
+    // 🔍 LOG 5 : Voir la réponse de n8n
+    console.log("✅ Réponse de n8n:");
+    console.log("Status:", response.status);
+    console.log("Data:", JSON.stringify(response.data, null, 2));
 
     // 8. Répondre à Meta immédiatement
     return res.sendStatus(200);
 
   } catch (error) {
-    console.error("❌ Erreur:", error.message);
+    // 🔍 LOG 6 : Voir l'erreur complète
+    console.error("❌ ERREUR DÉTAILLÉE:");
+    console.error("Message:", error.message);
+    console.error("Status:", error.response?.status);
+    console.error("Data:", error.response?.data);
+    console.error("Stack:", error.stack);
+    
     // Important : on répond toujours 200 à Meta même en cas d'erreur
-    // pour éviter que Meta réessaie et crée des doublons
     return res.sendStatus(200);
   }
 });
@@ -89,9 +114,8 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 MAVA Infrastructure active sur le port ${PORT}`);
   console.log(`📍 Webhook prêt à recevoir de Meta`);
+  console.log(`🔗 URL n8n: ${N8N_WEBHOOK_URL}`);
 });
-
-
 
 
 
