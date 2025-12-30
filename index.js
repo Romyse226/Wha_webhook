@@ -6,7 +6,6 @@ app.use(express.json());
 
 // ===== CONFIGURATIONS =====
 const VERIFY_TOKEN = "MAVA_SECRET_2025";
-// UTILISATION DE L'URL DE PRODUCTION (Indispensable pour le mode "Publié" de n8n)
 const N8N_WEBHOOK_URL = "https://mavabot.app.n8n.cloud/webhook-test/mava-core";
 
 const processedMessages = new Set();
@@ -37,47 +36,41 @@ app.post('/webhook', async (req, res) => {
     const wamid = message.id;
     if (processedMessages.has(wamid)) return res.sendStatus(200);
     processedMessages.add(wamid);
-    // 1. Récupération brute (ex: 22576670439)
-    let phone = message.from.replace(/\D/g, ''); 
 
-    // 2. LOGIQUE D'ENCAPSULATION (PQ + AB)
-    // Si c'est la Côte d'Ivoire (225) et qu'il manque l'extension PQ (longueur 11)
+    // 1. Numéro brut (ex: 22576670439)
+    let phone = message.from.replace(/\D/g, '');
+
+    // 2. Encapsulation ARTCI 10 chiffres
     if (phone.startsWith('225') && phone.length === 11) {
-        const oldBlock = phone.substring(3); // On récupère l'ancien bloc AB (ex: 76670439)
-        const oldPrefix = oldBlock.substring(0, 2); // On récupère l'ancien identifiant (ex: 76)
+      const oldBlock = phone.substring(3);      // ex: 76670439
+      const oldPrefix = oldBlock.substring(0, 2); // ex: 76
 
-        let pq = "";
+      let pq = "";
 
-        // On détermine le PQ selon l'ancien préfixe (AB) pour ton test
-        // NOTE : En 2025, pour ton test MTN, le PQ est 01
-        // Mais comme tu veux être universel, on suit la table de vérité ARTCI :
-        
-        // Liste simplifiée des anciens préfixes par opérateur :
-        const orangePrefixes = ["07","08","09","47","48","49","57","58","59","67","68","69","77","78","79","87","88","89","97","98"];
-        const mtnPrefixes = ["04","05","06","44","45","46","54","55","56","64","65","66","74","75","76","84","85","86","94","95","96"];
-        const moovPrefixes = ["01","02","03","40","41","42","43","50","51","52","53","60","61","62","63","70","71","72","73","80","81","82","83"];
+      const orangePrefixes = ["07","08","09","47","48","49","57","58","59","67","68","69","77","78","79","87","88","89","97","98"];
+      const mtnPrefixes = ["04","05","06","44","45","46","54","55","56","64","65","66","74","75","76","84","85","86","94","95","96"];
+      const moovPrefixes = ["01","02","03","40","41","42","43","50","51","52","53","60","61","62","63","70","71","72","73","80","81","82","83"];
 
-        if (mtnPrefixes.includes(oldPrefix)) pq = "01";
-        else if (orangePrefixes.includes(oldPrefix)) pq = "07";
-        else if (moovPrefixes.includes(oldPrefix)) pq = "05";
-        else pq = "01"; // Fallback de sécurité
+      if (mtnPrefixes.includes(oldPrefix)) pq = "01";
+      else if (orangePrefixes.includes(oldPrefix)) pq = "07";
+      else if (moovPrefixes.includes(oldPrefix)) pq = "05";
+      else pq = "01"; // fallback
 
-        phone = "225" + pq + oldBlock;
-        console.log(`🔧 ARTCI 10 Chiffres : ${message.from} -> ${phone}`);
+      phone = "225" + pq + oldBlock;
+      console.log(`🔧 ARTCI 10 Chiffres : ${message.from} -> ${phone}`);
     }
 
-    // --- PRÉPARATION PAYLOAD ---
+    // ===== PAYLOAD =====
     const payload = {
       wamid: wamid,
-      phone: phoneNumber,
+      phone: phone,
       name: value.contacts?.[0]?.profile?.name || "Client",
       text: message.text?.body || "",
       timestamp: message.timestamp
     };
 
-    console.log("📨 Envoi vers n8n:", phoneNumber);
+    console.log("📨 Envoi vers n8n:", phone);
 
-    // --- ENVOI N8N ---
     await axios.post(N8N_WEBHOOK_URL, payload, { timeout: 5000 });
 
     return res.sendStatus(200);
@@ -90,6 +83,7 @@ app.post('/webhook', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 MAVA actif sur port ${PORT}`));
+
 
 
 
