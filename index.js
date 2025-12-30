@@ -7,7 +7,7 @@ app.use(express.json());
 // ===== CONFIGURATIONS =====
 const VERIFY_TOKEN = "MAVA_SECRET_2025";
 // UTILISATION DE L'URL DE PRODUCTION (Indispensable pour le mode "Publié" de n8n)
-const N8N_WEBHOOK_URL = "mavabot.app.n8n.cloud";
+const N8N_WEBHOOK_URL = "https://mavabot.app.n8n.cloud/webhook-test/mava-core";
 
 const processedMessages = new Set();
 
@@ -79,4 +79,5 @@ app.post('/webhook', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 MAVA actif sur port ${PORT}`));
+
 
