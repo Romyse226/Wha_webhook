@@ -67,18 +67,27 @@ app.post('/webhook', async (req, res) => {
     // 5. Marquer ce message comme traité
     processedMessages.add(wamid);
 
-    // 6. Normaliser le numéro de téléphone (format ivoirien)
+    // 6. Normaliser le numéro de téléphone (tous pays)
     let phoneNumber = message.from;
     
-    // Si le numéro commence par 225 et a 11 chiffres, ajouter le 0
+    // Retirer tous les caractères non numériques (au cas où)
+    phoneNumber = phoneNumber.replace(/\D/g, '');
+    
+    // Gestion spécifique Côte d'Ivoire (transition ancien/nouveau format)
     if (phoneNumber.startsWith('225') && phoneNumber.length === 11) {
-      phoneNumber = '225' + '0' + phoneNumber.substring(3);
+      // Ancien format : 22576670439 (11 chiffres)
+      // Nouveau format : 2250576670439 (13 chiffres)
+      // On insère le 0 après le 225
+      const prefix = phoneNumber.substring(0, 3);  // "225"
+      const localNumber = phoneNumber.substring(3); // "76670439"
+      phoneNumber = prefix + '0' + localNumber;     // "225" + "0" + "76670439"
+      console.log(`📞 Numéro CI normalisé: ${phoneNumber}`);
     }
     
-    // Si le numéro ne commence pas par 225, l'ajouter
-    if (!phoneNumber.startsWith('225')) {
-      phoneNumber = '225' + phoneNumber;
-    }
+    // Pour tous les autres pays, on garde le format reçu de Meta
+    // Meta envoie toujours avec l'indicatif pays correct
+    
+    console.log(`📞 Numéro final: ${phoneNumber}`);
 
     // 7. Préparer les données propres pour n8n
     const payload = {
@@ -129,7 +138,5 @@ app.listen(PORT, () => {
   console.log(`📍 Webhook prêt à recevoir de Meta`);
   console.log(`🔗 URL n8n: ${N8N_WEBHOOK_URL}`);
 });
-
-
 
 
