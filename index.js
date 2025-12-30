@@ -37,30 +37,58 @@ app.post('/webhook', async (req, res) => {
     if (processedMessages.has(wamid)) return res.sendStatus(200);
     processedMessages.add(wamid);
 
-    // 1. Numéro brut (ex: 22576670439)
+    // ===== NUMÉRO BRUT =====
     let phone = message.from.replace(/\D/g, '');
 
-    // 2. Encapsulation ARTCI 10 chiffres
+    // ===== NORMALISATION ARTCI (8 → 10 chiffres) =====
     if (phone.startsWith('225') && phone.length === 11) {
-      const oldBlock = phone.substring(3);      // ex: 76670439
-      const oldPrefix = oldBlock.substring(0, 2); // ex: 76
+      const oldBlock = phone.substring(3);          // ex: 76670439
+      const oldPrefix = oldBlock.substring(0, 2);   // ex: 76
 
-      let pq = "";
+      let pq = null;
 
-      const orangePrefixes = ["07","08","09","47","48","49","57","58","59","67","68","69","77","78","79","87","88","89","97","98"];
-      const mtnPrefixes = ["04","05","06","44","45","46","54","55","56","64","65","66","74","75","76","84","85","86","94","95","96"];
-      const moovPrefixes = ["01","02","03","40","41","42","43","50","51","52","53","60","61","62","63","70","71","72","73","80","81","82","83"];
+      // ===== TABLES ARTCI CORRECTES =====
+      const ORANGE = [
+        "07","08","09",
+        "47","48","49",
+        "57","58","59",
+        "67","68","69",
+        "74","75","76",
+        "77","78","79",
+        "87","88","89"
+      ];
 
-      if (mtnPrefixes.includes(oldPrefix)) pq = "01";
-      else if (orangePrefixes.includes(oldPrefix)) pq = "07";
-      else if (moovPrefixes.includes(oldPrefix)) pq = "05";
-      else pq = "01"; // fallback
+      const MTN = [
+        "04","05","06",
+        "44","45","46",
+        "54","55","56",
+        "64","65","66",
+        "84","85","86",
+        "94","95","96"
+      ];
+
+      const MOOV = [
+        "01","02","03",
+        "40","41","42","43",
+        "50","51","52","53",
+        "60","61","62","63",
+        "70","71","72","73",
+        "80","81","82","83"
+      ];
+
+      if (MTN.includes(oldPrefix)) pq = "01";
+      else if (ORANGE.includes(oldPrefix)) pq = "07";
+      else if (MOOV.includes(oldPrefix)) pq = "05";
+      else {
+        console.error("❌ Préfixe ARTCI inconnu :", oldPrefix);
+        return res.sendStatus(200); // rejet propre
+      }
 
       phone = "225" + pq + oldBlock;
-      console.log(`🔧 ARTCI 10 Chiffres : ${message.from} -> ${phone}`);
+      console.log(`🔧 ARTCI normalisé : ${message.from} → ${phone}`);
     }
 
-    // ===== PAYLOAD =====
+    // ===== PAYLOAD N8N =====
     const payload = {
       wamid: wamid,
       phone: phone,
@@ -69,20 +97,21 @@ app.post('/webhook', async (req, res) => {
       timestamp: message.timestamp
     };
 
-    console.log("📨 Envoi vers n8n:", phone);
+    console.log("📨 Envoi vers n8n :", phone);
 
     await axios.post(N8N_WEBHOOK_URL, payload, { timeout: 5000 });
 
     return res.sendStatus(200);
 
   } catch (error) {
-    console.error("❌ Erreur transfert:", error.message);
+    console.error("❌ Erreur transfert :", error.message);
     return res.sendStatus(200);
   }
 });
 
+// ===== SERVER =====
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 MAVA actif sur port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 MAVA actif sur le port ${PORT}`));
 
 
 
