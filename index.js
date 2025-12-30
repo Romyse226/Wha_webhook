@@ -67,10 +67,23 @@ app.post('/webhook', async (req, res) => {
     // 5. Marquer ce message comme traité
     processedMessages.add(wamid);
 
-    // 6. Préparer les données propres pour n8n
+    // 6. Normaliser le numéro de téléphone (format ivoirien)
+    let phoneNumber = message.from;
+    
+    // Si le numéro commence par 225 et a 11 chiffres, ajouter le 0
+    if (phoneNumber.startsWith('225') && phoneNumber.length === 11) {
+      phoneNumber = '225' + '0' + phoneNumber.substring(3);
+    }
+    
+    // Si le numéro ne commence pas par 225, l'ajouter
+    if (!phoneNumber.startsWith('225')) {
+      phoneNumber = '225' + phoneNumber;
+    }
+
+    // 7. Préparer les données propres pour n8n
     const payload = {
       wamid: wamid,
-      phone: message.from,
+      phone: phoneNumber,
       name: value.contacts?.[0]?.profile?.name || "Client",
       text: message.text?.body || "",
       timestamp: message.timestamp
@@ -116,7 +129,6 @@ app.listen(PORT, () => {
   console.log(`📍 Webhook prêt à recevoir de Meta`);
   console.log(`🔗 URL n8n: ${N8N_WEBHOOK_URL}`);
 });
-
 
 
 
