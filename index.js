@@ -4,11 +4,11 @@ const app = express();
 
 app.use(express.json());
 
-// ===== TES CONFIGURATIONS =====
+// ===== CONFIGURATIONS =====
 const VERIFY_TOKEN = "MAVA_SECRET_2025";
-const N8N_WEBHOOK_URL = "https://mavabot.app.n8n.cloud/webhook-test/mava-core";
+// UTILISATION DE L'URL DE PRODUCTION (Indispensable pour le mode "Publié" de n8n)
+const N8N_WEBHOOK_URL = "mavabot.app.n8n.cloud";
 
-// Protection contre les doublons (en mémoire pour MVP)
 const processedMessages = new Set();
 
 // ===== ROUTE GET (Validation Meta) =====
@@ -21,113 +21,62 @@ app.get('/webhook', (req, res) => {
     console.log("✅ Webhook validé par Meta");
     return res.status(200).send(challenge);
   }
-  
-  console.log("❌ Token invalide");
   return res.sendStatus(403);
 });
 
 // ===== ROUTE POST (Messages entrants) =====
 app.post('/webhook', async (req, res) => {
   try {
-    // 1. LOG : Voir tout ce que WhatsApp envoie
-    console.log("📦 PAYLOAD BRUT reçu de WhatsApp:");
-    console.log(JSON.stringify(req.body, null, 2));
-
-    // 2. Extraire les données du payload Meta
     const entry = req.body.entry?.[0];
     const changes = entry?.changes?.[0];
     const value = changes?.value;
     const message = value?.messages?.[0];
 
-    // 3. LOG : Vérifier ce qu'on a extrait
-    console.log("📋 Entry:", entry ? "✅" : "❌");
-    console.log("📋 Changes:", changes ? "✅" : "❌");
-    console.log("📋 Value:", value ? "✅" : "❌");
-    console.log("📋 Message:", message ? "✅" : "❌");
+    if (!message) return res.sendStatus(200);
 
-    // 4. Si pas de message, on répond OK et on arrête
-    if (!message) {
-      console.log("⚠️ Webhook reçu mais pas de message");
-      return res.sendStatus(200);
-    }
-
-    // 5. Extraire l'ID unique du message
     const wamid = message.id;
-    console.log("🆔 WAMID:", wamid);
-
-    // 6. Vérifier si on a déjà traité ce message
-    if (processedMessages.has(wamid)) {
-      console.log(`⏭️ Message déjà traité: ${wamid}`);
-      return res.sendStatus(200);
-    }
-
-    // 7. Marquer ce message comme traité
+    if (processedMessages.has(wamid)) return res.sendStatus(200);
     processedMessages.add(wamid);
 
-    // 8. NORMALISER LE NUMÉRO DE TÉLÉPHONE
-    let phoneNumber = message.from;
+    // --- NORMALISATION DU NUMÉRO ---
+    let phoneNumber = message.from.replace(/\D/g, ''); // Nettoyage
     
-    // Retirer tous les caractères non numériques (au cas où)
-    phoneNumber = phoneNumber.replace(/\D/g, '');
-    
-    console.log(`📞 Numéro reçu de Meta: ${phoneNumber} (${phoneNumber.length} chiffres)`);
-    
-    // Gestion spécifique Côte d'Ivoire (transition ancien/nouveau format)
+    // Correction Côte d'Ivoire (Si 11 chiffres, il manque le préfixe 01, 05 ou 07)
     if (phoneNumber.startsWith('225') && phoneNumber.length === 11) {
-      // Ancien format : 22576670439 (11 chiffres)
-      // Nouveau format : 2250576670439 (13 chiffres)
-      // On insère le 0 après le 225
-      const prefix = phoneNumber.substring(0, 3);       // "225"
-      const localNumber = phoneNumber.substring(3);     // "76670439"
-      phoneNumber = prefix + '0' + localNumber;         // "2250576670439"
-      console.log(`📞 Numéro CI normalisé: ${phoneNumber} (${phoneNumber.length} chiffres)`);
-    } else {
-      console.log(`📞 Numéro conservé tel quel: ${phoneNumber}`);
+      const eightDigits = phoneNumber.substring(3);
+      const firstDigit = eightDigits[0];
+
+      let fullPrefix = "05"; // Par défaut MTN (ton cas)
+      if (["0", "1", "2", "3"].includes(firstDigit)) fullPrefix = "01"; // Orange
+      if (["4", "5", "6"].includes(firstDigit)) fullPrefix = "05";      // MTN
+      if (["7", "8", "9"].includes(firstDigit)) fullPrefix = "07";      // Moov
+
+      phoneNumber = "225" + fullPrefix + eightDigits;
+      console.log(`🔧 Normalisation CI : ${message.from} -> ${phoneNumber}`);
     }
 
-    // 9. Préparer les données propres pour n8n
+    // --- PRÉPARATION PAYLOAD ---
     const payload = {
       wamid: wamid,
-      phone: phoneNumber,  // ← Numéro normalisé
+      phone: phoneNumber,
       name: value.contacts?.[0]?.profile?.name || "Client",
       text: message.text?.body || "",
       timestamp: message.timestamp
     };
 
-    console.log("📨 Payload préparé pour n8n:");
-    console.log(JSON.stringify(payload, null, 2));
+    console.log("📨 Envoi vers n8n:", phoneNumber);
 
-    // 10. Envoyer vers n8n
-    const response = await axios.post(N8N_WEBHOOK_URL, payload, {
-      timeout: 5000,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    // --- ENVOI N8N ---
+    await axios.post(N8N_WEBHOOK_URL, payload, { timeout: 5000 });
 
-    console.log("✅ Réponse de n8n:");
-    console.log("Status:", response.status);
-    console.log("Data:", JSON.stringify(response.data, null, 2));
-
-    // 11. Répondre à Meta immédiatement
     return res.sendStatus(200);
 
   } catch (error) {
-    console.error("❌ ERREUR DÉTAILLÉE:");
-    console.error("Message:", error.message);
-    console.error("Status:", error.response?.status);
-    console.error("Data:", error.response?.data);
-    
-    // Important : on répond toujours 200 à Meta même en cas d'erreur
+    console.error("❌ Erreur transfert:", error.message);
     return res.sendStatus(200);
   }
 });
 
-// ===== DÉMARRAGE DU SERVEUR =====
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 MAVA Infrastructure active sur le port ${PORT}`);
-  console.log(`📍 Webhook prêt à recevoir de Meta`);
-  console.log(`🔗 URL n8n: ${N8N_WEBHOOK_URL}`);
-});
+app.listen(PORT, () => console.log(`🚀 MAVA actif sur port ${PORT}`));
 
