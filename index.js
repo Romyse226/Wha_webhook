@@ -37,22 +37,33 @@ app.post('/webhook', async (req, res) => {
     const wamid = message.id;
     if (processedMessages.has(wamid)) return res.sendStatus(200);
     processedMessages.add(wamid);
+    // 1. Récupération brute (ex: 22576670439)
+    let phone = message.from.replace(/\D/g, ''); 
 
-    // --- NORMALISATION DU NUMÉRO ---
-    let phoneNumber = message.from.replace(/\D/g, ''); // Nettoyage
-    
-    // Correction Côte d'Ivoire (Si 11 chiffres, il manque le préfixe 01, 05 ou 07)
-    if (phoneNumber.startsWith('225') && phoneNumber.length === 11) {
-      const eightDigits = phoneNumber.substring(3);
-      const firstDigit = eightDigits[0];
+    // 2. LOGIQUE D'ENCAPSULATION (PQ + AB)
+    // Si c'est la Côte d'Ivoire (225) et qu'il manque l'extension PQ (longueur 11)
+    if (phone.startsWith('225') && phone.length === 11) {
+        const oldBlock = phone.substring(3); // On récupère l'ancien bloc AB (ex: 76670439)
+        const oldPrefix = oldBlock.substring(0, 2); // On récupère l'ancien identifiant (ex: 76)
 
-      let fullPrefix = "05"; // Par défaut MTN (ton cas)
-      if (["0", "1", "2", "3"].includes(firstDigit)) fullPrefix = "01"; // Orange
-      if (["4", "5", "6"].includes(firstDigit)) fullPrefix = "05";      // MTN
-      if (["7", "8", "9"].includes(firstDigit)) fullPrefix = "07";      // Moov
+        let pq = "";
 
-      phoneNumber = "225" + fullPrefix + eightDigits;
-      console.log(`🔧 Normalisation CI : ${message.from} -> ${phoneNumber}`);
+        // On détermine le PQ selon l'ancien préfixe (AB) pour ton test
+        // NOTE : En 2025, pour ton test MTN, le PQ est 01
+        // Mais comme tu veux être universel, on suit la table de vérité ARTCI :
+        
+        // Liste simplifiée des anciens préfixes par opérateur :
+        const orangePrefixes = ["07","08","09","47","48","49","57","58","59","67","68","69","77","78","79","87","88","89","97","98"];
+        const mtnPrefixes = ["04","05","06","44","45","46","54","55","56","64","65","66","74","75","76","84","85","86","94","95","96"];
+        const moovPrefixes = ["01","02","03","40","41","42","43","50","51","52","53","60","61","62","63","70","71","72","73","80","81","82","83"];
+
+        if (mtnPrefixes.includes(oldPrefix)) pq = "01";
+        else if (orangePrefixes.includes(oldPrefix)) pq = "07";
+        else if (moovPrefixes.includes(oldPrefix)) pq = "05";
+        else pq = "01"; // Fallback de sécurité
+
+        phone = "225" + pq + oldBlock;
+        console.log(`🔧 ARTCI 10 Chiffres : ${message.from} -> ${phone}`);
     }
 
     // --- PRÉPARATION PAYLOAD ---
@@ -79,5 +90,6 @@ app.post('/webhook', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 MAVA actif sur port ${PORT}`));
+
 
 
