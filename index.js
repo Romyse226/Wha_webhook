@@ -37,43 +37,28 @@ app.post('/webhook', async (req, res) => {
     // ===== Numéro brut =====
     let phone = message.from.replace(/\D/g, '');
 
-    // ===== Normalisation ARTCI (8 → 10 chiffres) =====
-    if (phone.startsWith("225") && phone.length === 11) {
-      const oldBlock = phone.slice(3);        // AB + 6 chiffres
-      const oldPrefix = oldBlock.slice(0, 2); // AB
+        // --- NORMALISATION ARTCI (Rétablissement du PQ manquant) ---
+    let phone = message.from.replace(/\D/g, ''); 
 
-      let pq = null;
+    // Si Meta envoie le format tronqué (225 + 8 chiffres = 11 chiffres)
+    if (phone.startsWith('225') && phone.length === 11) {
+      const ab = phone.substring(3, 5); // L'ancien bloc AB (ex: 76)
+      const reste = phone.substring(3); // Le bloc complet ABXXXXXX
+      let pq = "";
 
-      // ===== TABLES AB (anciens préfixes) =====
-      const MTN_AB = [
-        "04","05","06","44","45","46","54","55","56",
-        "64","65","66","74","75","76","84","85",
-        "94","95","96"
-      ];
+      // TABLES DE VÉRITÉ OFFICIELLES (PQ = Opérateur)
+      const mtnAB = ["04","05","06","44","45","46","54","55","56","64","65","66","74","75","76","84","85","86","94","95","96"];
+      const orangeAB = ["07","08","09","47","48","49","57","58","59","67","68","69","77","78","79","87","88","89","97","98","99"];
+      const moovAB = ["01","02","03","40","41","42","43","50","51","52","53","60","61","62","63","70","71","72","73","80","81","82","83","90","91","92","93"];
 
-      const ORANGE_AB = [
-        "07","08","09","47","48","49","57","58","59",
-        "67","68","69","77","78","79","87","88","89",
-        "97","98","99"
-      ];
+      // Règle 2025 : On remet le PQ devant l'ancien bloc AB
+      if (mtnAB.includes(ab)) pq = "05";      // MTN = 05
+      else if (orangeAB.includes(ab)) pq = "07";   // ORANGE = 07
+      else if (moovAB.includes(ab)) pq = "01";     // MOOV = 01
+      else pq = "05"; // Sécurité par défaut (MTN)
 
-      const MOOV_AB = [
-        "01","02","03","40","41","42","43","50","51","52","53",
-        "60","61","62","63","70","71","72","73",
-        "80","81","82","83","90","91","92","93"
-      ];
-
-      // ===== DÉDUCTION DU PQ (clé absolue) =====
-      if (MTN_AB.includes(oldPrefix)) pq = "01";
-      else if (MOOV_AB.includes(oldPrefix)) pq = "05";
-      else if (ORANGE_AB.includes(oldPrefix)) pq = "07";
-      else {
-        console.error("❌ Préfixe AB inconnu :", oldPrefix);
-        return res.sendStatus(200);
-      }
-
-      phone = "225" + pq + oldBlock;
-      console.log(`🔧 ARTCI normalisé : ${message.from} → ${phone}`);
+      phone = "225" + pq + reste; 
+      console.log(`🔧 RÉPARATION ARTCI : ${message.from} -> ${phone}`);
     }
 
     // ===== Payload n8n =====
@@ -98,4 +83,5 @@ app.post('/webhook', async (req, res) => {
 // ===== Server =====
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 MAVA actif sur ${PORT}`));
+
 
