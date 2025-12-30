@@ -29,80 +29,75 @@ app.get('/webhook', (req, res) => {
 // ===== ROUTE POST (Messages entrants) =====
 app.post('/webhook', async (req, res) => {
   try {
-    // 🔍 LOG 1 : Voir TOUT ce que WhatsApp envoie
+    // 1. LOG : Voir tout ce que WhatsApp envoie
     console.log("📦 PAYLOAD BRUT reçu de WhatsApp:");
     console.log(JSON.stringify(req.body, null, 2));
 
-    // 1. Extraire les données du payload Meta
+    // 2. Extraire les données du payload Meta
     const entry = req.body.entry?.[0];
     const changes = entry?.changes?.[0];
     const value = changes?.value;
     const message = value?.messages?.[0];
 
-    // 🔍 LOG 2 : Vérifier ce qu'on a extrait
+    // 3. LOG : Vérifier ce qu'on a extrait
     console.log("📋 Entry:", entry ? "✅" : "❌");
     console.log("📋 Changes:", changes ? "✅" : "❌");
     console.log("📋 Value:", value ? "✅" : "❌");
     console.log("📋 Message:", message ? "✅" : "❌");
 
-    // 2. Si pas de message, on répond OK et on arrête
+    // 4. Si pas de message, on répond OK et on arrête
     if (!message) {
       console.log("⚠️ Webhook reçu mais pas de message");
-      console.log("🔍 Contenu de req.body:", req.body);
       return res.sendStatus(200);
     }
 
-    // 3. Extraire l'ID unique du message
+    // 5. Extraire l'ID unique du message
     const wamid = message.id;
-
-    // 🔍 LOG 3 : Afficher le wamid
     console.log("🆔 WAMID:", wamid);
 
-    // 4. Vérifier si on a déjà traité ce message
+    // 6. Vérifier si on a déjà traité ce message
     if (processedMessages.has(wamid)) {
       console.log(`⏭️ Message déjà traité: ${wamid}`);
       return res.sendStatus(200);
     }
 
-    // 5. Marquer ce message comme traité
+    // 7. Marquer ce message comme traité
     processedMessages.add(wamid);
 
-    // 6. Normaliser le numéro de téléphone (tous pays)
+    // 8. NORMALISER LE NUMÉRO DE TÉLÉPHONE
     let phoneNumber = message.from;
     
     // Retirer tous les caractères non numériques (au cas où)
     phoneNumber = phoneNumber.replace(/\D/g, '');
+    
+    console.log(`📞 Numéro reçu de Meta: ${phoneNumber} (${phoneNumber.length} chiffres)`);
     
     // Gestion spécifique Côte d'Ivoire (transition ancien/nouveau format)
     if (phoneNumber.startsWith('225') && phoneNumber.length === 11) {
       // Ancien format : 22576670439 (11 chiffres)
       // Nouveau format : 2250576670439 (13 chiffres)
       // On insère le 0 après le 225
-      const prefix = phoneNumber.substring(0, 3);  // "225"
-      const localNumber = phoneNumber.substring(3); // "76670439"
-      phoneNumber = prefix + '0' + localNumber;     // "225" + "0" + "76670439"
-      console.log(`📞 Numéro CI normalisé: ${phoneNumber}`);
+      const prefix = phoneNumber.substring(0, 3);       // "225"
+      const localNumber = phoneNumber.substring(3);     // "76670439"
+      phoneNumber = prefix + '0' + localNumber;         // "2250576670439"
+      console.log(`📞 Numéro CI normalisé: ${phoneNumber} (${phoneNumber.length} chiffres)`);
+    } else {
+      console.log(`📞 Numéro conservé tel quel: ${phoneNumber}`);
     }
-    
-    // Pour tous les autres pays, on garde le format reçu de Meta
-    // Meta envoie toujours avec l'indicatif pays correct
-    
-    console.log(`📞 Numéro final: ${phoneNumber}`);
 
-    // 7. Préparer les données propres pour n8n
+    // 9. Préparer les données propres pour n8n
     const payload = {
       wamid: wamid,
-      phone: phoneNumber,
+      phone: phoneNumber,  // ← Numéro normalisé
       name: value.contacts?.[0]?.profile?.name || "Client",
       text: message.text?.body || "",
       timestamp: message.timestamp
     };
 
-    // 🔍 LOG 4 : Voir ce qu'on va envoyer à n8n
     console.log("📨 Payload préparé pour n8n:");
     console.log(JSON.stringify(payload, null, 2));
 
-    // 7. Envoyer vers n8n
+    // 10. Envoyer vers n8n
     const response = await axios.post(N8N_WEBHOOK_URL, payload, {
       timeout: 5000,
       headers: {
@@ -110,21 +105,18 @@ app.post('/webhook', async (req, res) => {
       }
     });
 
-    // 🔍 LOG 5 : Voir la réponse de n8n
     console.log("✅ Réponse de n8n:");
     console.log("Status:", response.status);
     console.log("Data:", JSON.stringify(response.data, null, 2));
 
-    // 8. Répondre à Meta immédiatement
+    // 11. Répondre à Meta immédiatement
     return res.sendStatus(200);
 
   } catch (error) {
-    // 🔍 LOG 6 : Voir l'erreur complète
     console.error("❌ ERREUR DÉTAILLÉE:");
     console.error("Message:", error.message);
     console.error("Status:", error.response?.status);
     console.error("Data:", error.response?.data);
-    console.error("Stack:", error.stack);
     
     // Important : on répond toujours 200 à Meta même en cas d'erreur
     return res.sendStatus(200);
@@ -138,5 +130,4 @@ app.listen(PORT, () => {
   console.log(`📍 Webhook prêt à recevoir de Meta`);
   console.log(`🔗 URL n8n: ${N8N_WEBHOOK_URL}`);
 });
-
 
