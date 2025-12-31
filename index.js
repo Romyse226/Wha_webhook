@@ -5,7 +5,7 @@ app.use(express.json());
 
 // ===== CONFIG =====
 const VERIFY_TOKEN = "MAVA_SECRET_2025";
-const N8N_WEBHOOK_URL = "https://mavabot.app.n8n.cloud/webhook/mava-core";
+const N8N_WEBHOOK_URL = "https://mavabot.app.n8n.cloud/webhook-test/mava-core";
 const processedMessages = new Set();
 
 // ===== GET : Validation Meta =====
@@ -63,13 +63,22 @@ app.post('/webhook', async (req, res) => {
       console.log(`📞 Numéro conservé tel quel: ${phone}`);
     }
 
+    // ===== RÉCUPÉRATION DU NUMÉRO DU VENDEUR =====
+    // Option 1 : Si tu as UN SEUL vendeur (MVP Solo)
+    const vendor_phone = "2250576670439"; // ← REMPLACE PAR TON NUMÉRO WHATSAPP BUSINESS
+    
+    // Option 2 : Si tu as plusieurs vendeurs (Scalable - à utiliser plus tard)
+    // const phone_number_id = value.metadata?.phone_number_id;
+    // const vendor_phone = await getVendorPhoneFromId(phone_number_id);
+
     // ===== Payload n8n =====
     const payload = {
       wamid,
       phone,
       name: value.contacts?.[0]?.profile?.name || "Client",
       text: message.text?.body || "",
-      timestamp: message.timestamp
+      timestamp: message.timestamp,
+      vendor_phone  // ← NOUVEAU : Le numéro du vendeur
     };
     
     console.log(`📨 Envoi à n8n: ${JSON.stringify(payload, null, 2)}`);
@@ -93,7 +102,6 @@ app.post('/webhook', async (req, res) => {
 // ===== Server =====
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 MAVA actif sur ${PORT}`));
-
 
 
 
